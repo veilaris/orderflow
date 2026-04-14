@@ -43,8 +43,8 @@ gunicorn tg_bot:app
 
 | | |
 |---|---|
-| Дашборд (Vercel) | _вставить ссылку_ |
-| GitHub-репо | _вставить ссылку_ |
+| Дашборд (Vercel) | https://orderflow-rho.vercel.app/ |
+| GitHub-репо | https://github.com/veilaris/orderflow |
 | Скриншоты | см. папку [`screenshots/`](screenshots/) |
 
 ---
