@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OrderFlow</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens ─────────────────────────────────────────────────────────────── */
+    :root {
+      --bg:           #050d1f;
+      --surface:      #0b1629;
+      --surface-hi:   #112040;
+      --border:       rgba(96, 165, 250, 0.12);
+      --border-hi:    rgba(96, 165, 250, 0.28);
+      --text:         #e8f0fe;
+      --text-muted:   #6b8ab0;
+      --blue:         #60a5fa;
+      --blue-bar:     #3b82f6;
+      --blue-bar-h:   #2563eb;
+      --cyan-bar:     #22d3ee;
+      --cyan-bar-h:   #06b6d4;
+      --violet-bar:   #a78bfa;
+      --violet-bar-h: #7c3aed;
+      --radius:       18px;
+    }
+
+    /* ── Base ───────────────────────────────────────────────────────────────── */
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg);
+      background-image:
+        radial-gradient(ellipse 80% 40% at 15% 0%,   rgba(37,99,235,.18)  0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 100%,  rgba(139,92,246,.12) 0%, transparent 60%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────────── */
+    header {
+      padding: 22px 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(5, 13, 31, 0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      background: linear-gradient(125deg, #93c5fd 0%, #818cf8 60%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      user-select: none;
+    }
+    .updated-at {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
+    main {
+      padding: 36px 44px 52px;
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    /* ── Card base ───────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Top shimmer line */
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--border-hi) 40%, var(--border-hi) 60%, transparent 100%);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    /* ── Error banner ────────────────────────────────────────────────────────── */
+    .error-banner {
+      display: none;
+      background: rgba(239,68,68,.1);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: var(--radius);
+      padding: 16px 24px;
+      color: #fca5a5;
+      font-size: 14px;
+    }
+
+    /* ── Block 1 — Stat cards ────────────────────────────────────────────────── */
+    .block-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, var(--border-hi) 40%, var(--border-hi) 60%, transparent 100%);
+    }
+    /* Subtle glow blob */
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 180px;
+      height: 180px;
+      background: radial-gradient(circle, rgba(96,165,250,.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .stat-label {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+    .stat-value-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .stat-value {
+      font-size: 72px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1;
+      letter-spacing: -2px;
+      font-variant-numeric: tabular-nums;
+      word-break: break-word;
+    }
+    .stat-currency {
+      font-size: 44px;
+      font-weight: 700;
+      color: var(--blue);
+      flex-shrink: 0;
+      letter-spacing: -1px;
+    }
+
+    /* ── Block 2 — Products ──────────────────────────────────────────────────── */
+    .products-headers {
+      display: flex;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+    .products-header-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .products-chart-wrap {
+      position: relative;
+    }
+
+    /* ── Block 3 — Split ─────────────────────────────────────────────────────── */
+    .block-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+    .bar-chart-wrap {
+      position: relative;
+      height: 260px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── SUPABASE RLS ───────────────────────────────────────────────────────────
+  Run once in Supabase SQL Editor:
+
+  alter table orders      enable row level security;
+  alter table order_items enable row level security;
+  create policy "public read orders"      on orders      for select to anon using (true);
+  create policy "public read order_items" on order_items for select to anon using (true);
+──────────────────────────────────────────────────────────────────────────── -->
+
+<header>
+  <div class="logo">OrderFlow</div>
+  <div class="updated-at" id="updated-at"></div>
+</header>
+
+<main>
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- Block 1 -->
+  <div class="block-stats">
+    <div class="stat-card">
+      <div class="stat-label">Общее количество заказов</div>
+      <div class="stat-value" id="total-orders">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Сумма заказов</div>
+      <div class="stat-value-wrap">
+        <div class="stat-value" id="total-sum">—</div>
+        <div class="stat-currency">₸</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Block 2 -->
+  <div class="card">
+    <div class="card-title">Популярные товары</div>
+    <div class="products-headers">
+      <span class="products-header-label">Название товара</span>
+      <span class="products-header-label">Количество проданных товаров</span>
+    </div>
+    <div class="products-chart-wrap" id="products-wrap">
+      <canvas id="chart-products"></canvas>
+    </div>
+  </div>
+
+  <!-- Block 3 -->
+  <div class="block-split">
+    <div class="card">
+      <div class="card-title">Заказы по городам</div>
+      <div class="bar-chart-wrap">
+        <canvas id="chart-cities"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Источники трафика</div>
+      <div class="bar-chart-wrap">
+        <canvas id="chart-traffic"></canvas>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ─── Configuration ───────────────────────────────────────────────────────────
+  // Use the PUBLISHABLE key (anon key) from Supabase → Settings → API.
+  // Do NOT use the secret key here — it will be visible to anyone.
+  const SUPABASE_URL            = 'https://iasotqmzgekqinxvlnfr.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_RmElfuKO9suvUM2d_UmoAA_vF2UW15n';
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // ─── Chart palette ───────────────────────────────────────────────────────────
+  const LABEL_COLOR  = '#e8f0fe';
+  const TICK_COLOR   = '#6b8ab0';
+
+  // Each product bar gets its own color from a cool-toned palette
+  const PRODUCT_PALETTE = [
+    '#3b82f6', // blue
+    '#22d3ee', // cyan
+    '#a78bfa', // violet
+    '#34d399', // emerald
+    '#818cf8', // indigo
+    '#67e8f9', // sky
+    '#c084fc', // purple
+    '#6ee7b7', // teal
+    '#93c5fd', // light blue
+    '#a5b4fc', // light indigo
+  ];
+
+  // ─── Chart.js defaults ───────────────────────────────────────────────────────
+  Chart.defaults.font.family = "'Inter', -apple-system, system-ui, sans-serif";
+  Chart.defaults.color = TICK_COLOR;
+
+  // ─── Supabase ────────────────────────────────────────────────────────────────
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  async function fetchData() {
+    const [ordersRes, itemsRes] = await Promise.all([
+      sb.from('orders').select('total_sum, delivery_city, utm_source'),
+      sb.from('order_items').select('product_name, quantity'),
+    ]);
+    if (ordersRes.error) throw new Error(ordersRes.error.message);
+    if (itemsRes.error)  throw new Error(itemsRes.error.message);
+    return { orders: ordersRes.data, items: itemsRes.data };
+  }
+
+  // ─── Processing ──────────────────────────────────────────────────────────────
+  function processData({ orders, items }) {
+    const totalOrders = orders.length;
+    const totalSum    = orders.reduce((s, o) => s + (Number(o.total_sum) || 0), 0);
+
+    const productMap = {};
+    for (const item of items) {
+      if (!item.product_name) continue;
+      productMap[item.product_name] = (productMap[item.product_name] || 0) + (Number(item.quantity) || 0);
+    }
+    const products = Object.entries(productMap).sort((a,b) => b[1]-a[1]).slice(0, 10);
+
+    const cityMap = {};
+    for (const o of orders) {
+      if (!o.delivery_city) continue;
+      cityMap[o.delivery_city] = (cityMap[o.delivery_city] || 0) + 1;
+    }
+    const cities = Object.entries(cityMap).sort((a,b) => b[1]-a[1]);
+
+    const utmMap = {};
+    for (const o of orders) {
+      if (!o.utm_source) continue;
+      utmMap[o.utm_source] = (utmMap[o.utm_source] || 0) + 1;
+    }
+    const traffic = Object.entries(utmMap).sort((a,b) => b[1]-a[1]);
+
+    return { totalOrders, totalSum, products, cities, traffic };
+  }
+
+  function fmt(n) {
+    return new Intl.NumberFormat('ru-RU').format(Math.round(n));
+  }
+
+  // ─── Stats ───────────────────────────────────────────────────────────────────
+  function renderStats(totalOrders, totalSum) {
+    document.getElementById('total-orders').textContent = fmt(totalOrders);
+    document.getElementById('total-sum').textContent    = fmt(totalSum);
+  }
+
+  // ─── Gradient helper ─────────────────────────────────────────────────────────
+  function barGradient(ctx, chartArea, colorTop, colorBottom) {
+    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gradient.addColorStop(0,   colorTop);
+    gradient.addColorStop(1,   colorBottom);
+    return gradient;
+  }
+
+  // ─── Products chart (horizontal) ─────────────────────────────────────────────
+  let productsChart = null;
+  function renderProducts(products) {
+    const ROW_PX = 52;
+    const PAD_PX = 40;
+    const height = Math.max(products.length * ROW_PX + PAD_PX, 80);
+    const wrap   = document.getElementById('products-wrap');
+    wrap.style.height = height + 'px';
+
+    const labels = products.map(([name]) => name);
+    const values = products.map(([, qty])  => qty);
+    const maxVal = Math.max(...values, 1);
+
+    if (productsChart) productsChart.destroy();
+
+    productsChart = new Chart(document.getElementById('chart-products'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor(ctx) {
+            const chart = ctx.chart;
+            const { chartArea } = chart;
+            const color = PRODUCT_PALETTE[ctx.dataIndex % PRODUCT_PALETTE.length];
+            if (!chartArea) return color;
+            // Gradient: dim at left → full color at right (bar "lights up" at the tip)
+            const g = chart.ctx.createLinearGradient(chartArea.left, 0, chartArea.right, 0);
+            g.addColorStop(0,    'rgba(255,255,255,0.04)');
+            g.addColorStop(0.55, color + '99');
+            g.addColorStop(1,    color);
+            return g;
+          },
+          hoverBackgroundColor(ctx) {
+            return PRODUCT_PALETTE[ctx.dataIndex % PRODUCT_PALETTE.length];
+          },
+          borderRadius: 7,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { right: 60 } },
+        plugins: {
+          legend:  { display: false },
+          tooltip: { enabled: false },
+          datalabels: {
+            anchor:    'end',
+            align:     'end',
+            clip:      false,
+            color:     LABEL_COLOR,
+            font:      { size: 15, weight: '700' },
+            formatter: v => fmt(v),
+          },
+        },
+        scales: {
+          x: {
+            display: false,
+            max: maxVal * 1.2,
+            grid: { display: false },
+          },
+          y: {
+            grid:   { display: false },
+            border: { display: false },
+            ticks:  { font: { size: 15, weight: '500' }, color: LABEL_COLOR, padding: 10 },
+          },
+        },
+      },
+      plugins: [ChartDataLabels],
+    });
+  }
+
+  // ─── Vertical bar chart (cities / traffic) ───────────────────────────────────
+  function makeVerticalChart(canvasId, entries) {
+    const labels = entries.map(([k]) => k);
+    const values = entries.map(([, v]) => v);
+    const maxVal = Math.max(...values, 1);
+
+    return new Chart(document.getElementById(canvasId), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor(ctx) {
+            const chart = ctx.chart;
+            const { chartArea } = chart;
+            const color = PRODUCT_PALETTE[ctx.dataIndex % PRODUCT_PALETTE.length];
+            if (!chartArea) return color;
+            return barGradient(chart.ctx, chartArea, color, color + '44');
+          },
+          hoverBackgroundColor(ctx) {
+            return PRODUCT_PALETTE[ctx.dataIndex % PRODUCT_PALETTE.length];
+          },
+          borderRadius: 7,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 32 } },
+        plugins: {
+          legend:  { display: false },
+          tooltip: { enabled: false },
+          datalabels: {
+            anchor:    'end',
+            align:     'end',
+            clip:      false,
+            color:     LABEL_COLOR,
+            font:      { size: 15, weight: '700' },
+            formatter: v => fmt(v),
+          },
+        },
+        scales: {
+          x: {
+            grid:   { display: false },
+            border: { display: false },
+            ticks:  { font: { size: 14, weight: '500' }, color: LABEL_COLOR },
+          },
+          y: {
+            display: false,
+            max: maxVal * 1.25,
+            grid: { display: false },
+          },
+        },
+      },
+      plugins: [ChartDataLabels],
+    });
+  }
+
+  // ─── Error ───────────────────────────────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('error-banner');
+    el.textContent = 'Ошибка загрузки данных: ' + msg;
+    el.style.display = 'block';
+  }
+
+  // ─── Init ────────────────────────────────────────────────────────────────────
+  (async function init() {
+    try {
+      const raw = await fetchData();
+      const { totalOrders, totalSum, products, cities, traffic } = processData(raw);
+
+      renderStats(totalOrders, totalSum);
+      renderProducts(products);
+      makeVerticalChart('chart-cities',  cities);
+      makeVerticalChart('chart-traffic', traffic);
+
+      const now = new Date().toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+      document.getElementById('updated-at').textContent = 'Обновлено: ' + now;
+    } catch (err) {
+      showError(err.message || String(err));
+    }
+  })();
+</script>
+</body>
+</html>
