@@ -105,7 +105,19 @@ def webhook() -> Response:
         log.warning("Unauthorized webhook request (wrong or missing secret)")
         return Response("Unauthorized", status=401)
 
-    payload = request.get_json(silent=True) or {}
+    # RetailCRM can send either JSON or urlencoded form data
+    payload = request.get_json(silent=True)
+    if not payload:
+        form = request.form.to_dict()
+        # RetailCRM urlencoded: order data may be a JSON string in "order" key
+        if "order" in form:
+            try:
+                import json as _json
+                payload = {"order": _json.loads(form["order"])}
+            except Exception:
+                payload = form
+        else:
+            payload = form
     log.info("Received payload: %s", payload)
 
     # RetailCRM wraps the order under the "order" key
